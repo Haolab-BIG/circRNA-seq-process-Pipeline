@@ -267,7 +267,7 @@ These directories contain the direct output from the CIRI2 detection step for ea
           * `junction_reads_ID`: A comma-separated list of all BSJ read IDs.
       * **Application**: This is the raw data file for a single sample. It's useful for deep dives into specific samples or for manual inspection of all detected circRNAs before filtering. The `#junction_reads` and `#non_junction_reads` columns are extracted by the pipeline to build the final count matrices.
    
-      * <img width="2272" height="102" alt="CleanShot 2025-09-21 at 21 57 54@2x" src="https://github.com/user-attachments/assets/6cb4ca67-952a-4091-8424-fb13471a894a" />
+      <img width="2272" height="102" alt="CleanShot 2025-09-21 at 21 57 54@2x" src="https://github.com/user-attachments/assets/6cb4ca67-952a-4091-8424-fb13471a894a" />
 
 
   * **`ciri2_output.tsv.log`**
