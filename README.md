@@ -215,7 +215,8 @@ These files represent the final, combined analysis results from all samples.
           * `CircID`: The unique identifier of the circRNA.
           * `pval`: The raw p-value from the statistical test.
           * `padj`: The p-value adjusted for multiple testing.
-          * `logFC_ratio`: The log2 fold change of the circular-to-linear ratio.
+          * `group_1_ratio_mean`: The mean circular-to-linear ratio of group 1.
+          * `group_2_ratio_mean`: The mean circular-to-linear ratio of group 2.
       * **Application**: Use this file to identify your top candidate circRNAs. An orthogonal validation method must be used to validate a predicted circRNA; qPCR validation on its own is not sufficient, at least qPCR + RNase R treatment or preferably qPCR + amplicon sequencing should be used.
 
   * **`circ_counts_matrix.tsv`** and **`linear_counts_matrix.tsv`**
