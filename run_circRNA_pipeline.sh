@@ -328,7 +328,15 @@ echo "======== Step 6: Generating Final MultiQC Report ========"
 MULTIQC_DIR_HOST="${OUT_DIR}/multiqc_report"
 mkdir -p "${MULTIQC_DIR_HOST}"
 eval "$SINGULARITY_BASE_CMD ${SIF_PATH} multiqc /output -o /output/multiqc_report --force"
-
+while IFS=, read -r SAMPLE_NAME CONDITION FQ1 FQ2; do
+    SAMPLE_NAME=$(echo "${SAMPLE_NAME}" | tr -d '[:space:]')
+    find "${OUT_DIR}/${SAMPLE_NAME}" -type f \
+        ! -name "ciri2*" \
+        -delete
+done < <(tail -n +2 "${SAMPLE_SHEET}" | tr -d '\r')
+rm -f "${OUT_DIR}/aggregate_counts.py"
+rm -f "${OUT_DIR}/run_CircTest.R"
+rm -f "${OUT_DIR}/samples_for_r.csv"
 echo -e "\n\n==================================================="
 echo "====== circRNA Pipeline Completed Successfully! ======"
 echo "==================================================="
