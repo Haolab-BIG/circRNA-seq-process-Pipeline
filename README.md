@@ -1,26 +1,17 @@
-# circRNA-seq Pipeline
+# circRNA-seq-Processing-Pipeline
+This pipeline provides a fully containerized Singularity environment that bundles all required tools and dependencies. With a single command, the entire circRNA-seq workflow—from raw FASTQ input through trimming, quality control, genome alignment (BWA-MEM), linear gene counting (featureCounts), circRNA detection (CIRI3), and differential expression analysis (edgeR & GLM)—can be executed reproducibly on any compatible system.
 
-This unified circRNA-seq pipeline processes raw paired-end FASTQ files through to differential expression results, using Singularity for reproducibility. It leverages the CIRI2 detector for accurate circRNA identification and the CircTest for statistical analysis.
-
-## Workflow
-
-<img width="2184" height="666" alt="CleanShot 2025-09-21 at 21 55 17@2x" src="https://github.com/user-attachments/assets/943e5529-1099-4ae3-b639-0f0522501c8a" />
+# Part I Workflow
+<img width="798" height="248" alt="CleanShot 2025-11-06 at 18 47 03@2x" src="https://github.com/user-attachments/assets/615f63b9-3408-48ba-b4bd-6d6026580566" />
 
 
-## Features
-
-  * **Single Command Execution**: Executes the entire workflow—from FASTQ input and QC, through circRNA quantification, to differential expression analysis—with a single command.
-  * **Reproducible**: All software (FastQC, Trim Galore, BWA, Samtools, CIRI2, Python, R/CircTest) is encapsulated within a Singularity container (`circRNA.sif`), ensuring analysis is fully reproducible.
-  * **Automated Reporting**: Generates a final, interactive MultiQC report summarizing quality control metrics across all samples and steps for easy assessment.
-
-## Requirements
-
-1.  **Recommended System Configuration**:
+# Part II Requirements
+1.  **Recommended Specs**:
 
       * 8-core CPU
-      * 64 GB RAM
+      * 24 GB RAM
 
-2.  **Singularity**: Must be installed on your system. Below are detailed steps for installing on an Ubuntu 22.04 system. For other operating systems, please refer to the [official installation guide](https://www.google.com/search?q=https://docs.sylabs.io/guides/latest/user-guide/installation.html).
+2.  **Singularity**: Must be installed on your system. Below are the detailed steps for installing on an Ubuntu 22.0.4 system. For other operating systems, please refer to the official installation guide: [https://docs.sylabs.io/guides/3.0/user-guide/installation.html](https://docs.sylabs.io/guides/3.0/user-guide/installation.html)
 
       * **Step 1: Install System Dependencies**
 
@@ -30,7 +21,7 @@ This unified circRNA-seq pipeline processes raw paired-end FASTQ files through t
         sudo apt-get install -y \
             build-essential \
             libseccomp-dev \
-        	libfuse3-dev \
+			libfuse3-dev \
             pkg-config \
             squashfs-tools \
             cryptsetup \
@@ -40,8 +31,8 @@ This unified circRNA-seq pipeline processes raw paired-end FASTQ files through t
       * **Step 2: Install Go Language**
 
         ```bash
-        # Download and install Go (check for the latest version)
-        wget https://go.dev/dl/go1.21.3.linux-amd64.tar.gz
+        # Download and install Go
+        wget [https://go.dev/dl/go1.21.3.linux-amd64.tar.gz](https://go.dev/dl/go1.21.3.linux-amd64.tar.gz)
         sudo tar -C /usr/local -xzvf go1.21.3.linux-amd64.tar.gz
         rm go1.21.3.linux-amd64.tar.gz
 
@@ -54,21 +45,26 @@ This unified circRNA-seq pipeline processes raw paired-end FASTQ files through t
       * **Step 3: Download, Build, and Install Singularity**
 
         ```bash
-        # Navigate to a suitable directory for downloading source code
-        cd /tmp
+        # Note: The script navigates to /mnt/share/software. 
+        # You can change this to your preferred directory for source code.
+        cd /mnt/share/software
 
-        # Download the Singularity CE source code (check for the latest version)
-        wget https://github.com/sylabs/singularity/releases/download/v4.0.1/singularity-ce-4.0.1.tar.gz
+        # Download the Singularity CE source code
+        wget [https://github.com/sylabs/singularity/releases/download/v4.0.1/singularity-ce-4.0.1.tar.gz](https://github.com/sylabs/singularity/releases/download/v4.0.1/singularity-ce-4.0.1.tar.gz)
 
         # Extract the archive and clean up
         tar -xvzf singularity-ce-4.0.1.tar.gz
         rm singularity-ce-4.0.1.tar.gz
         cd singularity-ce-4.0.1
 
-        # Configure, build, and install Singularity
+        # Configure the build
         ./mconfig
+
+        # Build Singularity (this can be time-consuming)
         cd builddir
         make
+
+        # Install Singularity to the system
         sudo make install
         ```
 
@@ -77,202 +73,276 @@ This unified circRNA-seq pipeline processes raw paired-end FASTQ files through t
         ```bash
         # Check the installed version
         singularity --version
+
+        # Display help information
+        singularity -h
         ```
 
+3.  **snakemake**: Snakemake must be installed on your system and requires a Python 3 distribution.
 
-3.  **Pipeline Files**:
+      ```bash
+      pip install snakemake
+      ```
 
-      * `run_circRNA_pipeline.sh`
-      * `circRNA.sif` (The Singularity container)
+4.  **Reference Data**: A directory containing the BWA index (Detailed steps for the human hg38 genome are below. For other reference genomes, please download the corresponding files and replace as needed).
+      ```bash
+      mkdir reference_data
+      cd reference_data
+      
+      # Download Genome FASTA
+      wget [https://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_46/GRCh38.primary_assembly.genome.fa.gz](https://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_46/GRCh38.primary_assembly.genome.fa.gz)
+      
+      # Download Genome GTF
+      wget [https://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_46/gencode.v46.primary_assembly.annotation.gtf.gz](https://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_46/gencode.v46.primary_assembly.annotation.gtf.gz)
+      
+      # Unzip the files
+      gunzip GRCh38.primary_assembly.genome.fa.gz
+      gunzip gencode.v46.primary_assembly.annotation.gtf.gz
+      
+      # (Optional) Rename for clarity
+      mv GRCh38.primary_assembly.genome.fa GRCh38.primary_assembly.genome.fa
+      mv gencode.v46.primary_assembly.annotation.gtf annotation.gtf
+      
+      # Build BWA index
+      # This command will use the Singularity container to ensure 'bwa' is available
+      # Replace 'circRNA_modified.sif' with the path to your container
+      singularity exec --cleanenv /path/to/circRNA_modified.sif bwa index GRCh38.primary_assembly.genome.fa
+      ```
 
-4.  **Reference Data**: A directory containing all necessary reference files.
+5.  **Required Files**:
 
-## Setup
+      ```bash
+      project_directory/
+      ├── snakemake/
+            ├── config.yaml
+            ├── circRNA-seq.smk
+            └── de_ciri3_all.R
+      ├── Containers/
+            └── circRNA_modified.sif
+      ├── reference_data/
+            ├── illumina_adapter.fa
+            ├── GRCh38.primary_assembly.genome.fa
+            ├── GRCh38.primary_assembly.genome.fa.amb
+            ├── GRCh38.primary_assembly.genome.fa.ann
+            ├── GRCh38.primary_assembly.genome.fa.bwt
+            ├── GRCh38.primary_assembly.genome.fa.pac
+            ├── GRCh38.primary_assembly.genome.fa.sa
+            └── annotation.gtf
+      └── fq/
+            ├── Control_Rep1_R1.fastq.gz
+            ├── Control_Rep1_R2.fastq.gz
+            ├── Treated_Rep1_R1.fastq.gz
+            └── ... (etc)
+      ```
+      
+      - **circRNA-seq.smk** — The main Snakemake workflow script.
+      - **config.yaml** — Configuration file containing paths, parameters, and sample information.
+      - **de_ciri3_all.R** — R script for all three types of circRNA differential expression analysis.
+      - **circRNA_modified.sif** — Singularity container image with all required software (FastQC, TrimGalore, BWA, samtools, featureCounts, CIRI3, R-libraries) and dependencies pre-installed.
+      - **illumina_adapter.fa** — FASTA file containing Illumina adapter sequences; replace with your own if needed.
+      - **GRCh38.primary_assembly.genome.fa** — Reference genome FASTA file.
+      - **annotation.gtf** — Genome annotation GTF file.
+      - **BWA Index Files** (`.amb`, `.ann`, `.bwt`, `.pac`, `.sa`) — Genome index generated by `bwa index`.
 
-### 1\. Prepare the Sample Sheet
+# Part III Running
 
-This is the most critical input file. Create a CSV file named `samplesheet.csv`. The pipeline is designed for **paired-end** sequencing data.
+   * **Example code**
 
-  * `sample_name`: A unique identifier for the sample (e.g., `Control_Rep1`).
-  * `condition`: The experimental group for the sample (e.g., `Control`, `Treated`).
-  * `fastq1_path`: The **absolute path** to the Read 1 FASTQ file.
-  * `fastq2_path`: The **absolute path** to the Read 2 FASTQ file.
+      * **Step 1: Edit `config.yaml`**
 
-**Example `samplesheet.csv`:**
+        ```yaml
+        # --- 1. Container ---
+        # Absolute path to Singularity image (.sif file)
+        # Must contain: fastqc, trim_galore, bwa, samtools, subread (featureCounts), java, multiqc
+        singularity_image: "/mnt/guanli/zh.4.cirRNAseq.singularity/snakemake/circRNA_modified.sif"
 
-```csv
-sample_name,condition,fastq1_path,fastq2_path
-Control_Rep1,Control,/path/to/data/C1_R1.fastq.gz,/path/to/data/C1_R2.fastq.gz
-Control_Rep2,Control,/path/to/data/C2_R1.fastq.gz,/path/to/data/C2_R2.fastq.gz
-Treated_Rep1,Treated,/path/to/data/T1_R1.fastq.gz,/path/to/data/T1_R2.fastq.gz
-Treated_Rep2,Treated,/path/to/data/T2_R1.fastq.gz,/path/to/data/T2_R2.fastq.gz
-```
+        # --- 2. Output directory ---
+        output_dir: "/mnt/guanli/zh.4.cirRNAseq.singularity/snakemake/circleRNA_results"
 
-### 2\. Prepare the Reference Data
+        # --- 3. Reference ---
+        ref:
+          fasta: "/mnt/guanli/zh.1.rnaseq.singularity/reference_data/GRCh38.primary_assembly.genome.fa"
+          gtf: "/mnt/guanli/zh.1.rnaseq.singularity/reference_data/annotation.gtf"
+          bwa_index: "/mnt/guanli/zh.1.rnaseq.singularity/reference_data/GRCh38.primary_assembly.genome.fa"
 
-The pipeline requires a reference genome, annotation, and a BWA index.
+        # --- 4. Adapter and trimming ---
+        trim:
+          adapter_fa: "/mnt/guanli/zh.1.rnaseq.singularity/reference_data/illumina_adapter.fa"
+          min_length: 20 # Minimum read length to keep
 
-#### Create Reference Directory
+        # --- 5. BWA-MEM parameters ---
+        bwa:
+          min_score: 19 # BWA-MEM -T option
 
-Create a dedicated directory for all reference data:
+        # --- 6. featureCounts parameters ---
+        featurecounts:
+          threads: 8
+          opts: "-p -s 0 -g gene_id" # -p (paired-end), -s 0 (unstranded), -g (group by gene_id)
 
-```bash
-mkdir -p reference_data
-cd reference_data
-```
+        # --- 7. CIRI3 parameters ---
+        ciri3:
+          threads: 8 # Threads for multi-sample run
+          threads_single: 4 # Threads for single-sample runs
+          max_span: 200000
+          min_span: 140
+          mapq_uni: 10
+          strigency: 2 # 2: >2 PCC signals; 1: >2 junction reads; 0: all
 
-#### Download Required Files (Human hg38/GRCh38 example)
+        # --- 8. Samples ---
+        # rnase: 0 = untreated, 1 = RNase R treated, 2 = unknown
+        samples:
+          Control_Rep1:
+            R1: "/mnt/guanli/zh.4.cirRNAseq.singularity/fq/Control_Rep1_R1.fastq.gz"
+            R2: "/mnt/guanli/zh.4.cirRNAseq.singularity/fq/Control_Rep1_R2.fastq.gz"
+            condition: "Control"
+            rnase: 0
+          Control_Rep2:
+            R1: "/mnt/guanli/zh.4.cirRNAseq.singularity/fq/Control_Rep2_R1.fastq.gz"
+            R2: "/mnt/guanli/zh.4.cirRNAseq.singularity/fq/Control_Rep2_R2.fastq.gz"
+            condition: "Control"
+            rnase: 0
+          Treated_Rep1:
+            R1: "/mnt/guanli/zh.4.cirRNAseq.singularity/fq/Treated_Rep1_R1.fastq.gz"
+            R2: "/mnt/guanli/zh.4.cirRNAseq.singularity/fq/Treated_Rep1_R2.fastq.gz"
+            condition: "Treated"
+            rnase: 0
+          Treated_Rep2:
+            R1: "/mnt/guanli/zh.4.cirRNAseq.singularity/fq/Treated_Rep2_R1.fastq.gz"
+            R2: "/mnt/guanli/zh.4.cirRNAseq.singularity/fq/Treated_Rep2_R2.fastq.gz"
+            condition: "Treated"
+            rnase: 0
 
-```bash
-# 1. Download Genome FASTA (from GENCODE)
-wget https://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_46/GRCh38.primary_assembly.genome.fa.gz
-gunzip GRCh38.primary_assembly.genome.fa.gz
+        # --- 9. Path to unified DE script ---
+        de_script: "/mnt/guanli/zh.4.cirRNAseq.singularity/snakemake/de_ciri3_all.R"
+        ```
 
-# 2. Download GTF Annotation (from GENCODE)
-wget https://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_46/gencode.v46.primary_assembly.annotation.gtf.gz
-gunzip gencode.v46.primary_assembly.annotation.gtf.gz
-mv gencode.v46.primary_assembly.annotation.gtf annotation.gtf
-```
+      * **Step 2: run snakemake**
+        (Ensure you run this from the directory containing `circRNA-seq.smk` and `config.yaml`)
 
-#### Build BWA Index
+        ```bash
+        snakemake -s circRNA-seq.smk --use-singularity --cores 8 \
+          --singularity-args "--bind /mnt/guanli"
+        ```
+        Then delete the intermediate files and folders:
 
-CIRI2 requires reads to be mapped with BWA-MEM. You must build the index using the `bwa` version inside the container.
+        ```bash
+        rm -r circleRNA_results/qc/ circleRNA_results/trimmed/ circleRNA_results/alignment/
+        ```
 
-```bash
-# The output prefix should match the FASTA filename for simplicity
-singularity exec circRNA.sif bwa index GRCh38.primary_assembly.genome.fa
-```
+        *Note*: The `--bind` parameter is crucial. It must include all parent directories referenced in your `config.yaml` (e.g., paths for `output_dir`, `ref`, `samples` R1/R2, `de_script`, and the `singularity_image` itself).
 
-#### Final Reference Structure
+   * **Command Parameters**
 
-Your `reference_data` directory should now contain the following files:
+      **edit `config.yaml`**
+      - `singularity_image`: Absolute path to the Singularity image (`.sif` file) (required).
+      - `output_dir`: Path to the directory where all output will be stored (required).
+      - `ref`:
+          - `fasta`: Path to the reference genome FASTA file (required).
+          - `gtf`: Path to the genome annotation GTF file (required).
+          - `bwa_index`: Prefix for the BWA index (usually same as FASTA path) (required).
+      - `trim`:
+          - `adapter_fa`: Path to the adapter sequences FASTA file (required).
+          - `min_length`: Minimum read length to keep after trimming (required).
+      - `bwa`:
+          - `min_score`: BWA-MEM `-T` option, alignments scoring lower will be discarded (required).
+      - `featurecounts`:
+          - `threads`: Number of threads for featureCounts (required).
+          - `opts`: Extra arguments for featureCounts (e.g., `-p` for paired-end, `-s 0` for unstranded) (required).
+      - `ciri3`:
+          - `threads`: Threads for CIRI3 multi-sample mode (required).
+          - `threads_single`: Threads for CIRI3 single-sample mode (required).
+          - `max_span`, `min_span`, `mapq_uni`, `strigency`: CIRI3 detection parameters (required).
+      - `samples`: Sample definition block (required).
+          - `Sample_Name`: A unique identifier for each sample.
+          - `R1`: Path to the R1 FASTQ file (required).
+          - `R2`: Path to the R2 FASTQ file (leave empty if not paired-end).
+          - `condition`: Experimental group for the sample (e.g., "Control", "Treated") (required).
+          - `rnase`: RNase R treatment status (0=untreated, 1=treated, 2=unknown) (required).
+      - `de_script`: Absolute path to the `de_ciri3_all.R` script (required).
 
-```
-reference_data/
-├── GRCh38.primary_assembly.genome.fa
-├── GRCh38.primary_assembly.genome.fa.amb
-├── GRCh38.primary_assembly.genome.fa.ann
-├── GRCh38.primary_assembly.genome.fa.bwt
-├── GRCh38.primary_assembly.genome.fa.pac
-├── GRCh38.primary_assembly.genome.fa.sa
-└── annotation.gtf
-```
+      **run snakemake**
+      - `--use-singularity`: Enables execution of rules within a Singularity container to ensure a fully reproducible environment.
+      - `--singularity-args`: Allows passing additional arguments to the Singularity runtime (e.g., `--bind`, `--nv`, or custom options).
+      - `--cores`: Specifies the maximum number of CPU cores (threads) that Snakemake can use in parallel when executing workflow rules.
+      - `--bind`: Specifies the directories to be mounted within the Singularity container. Include all required paths such as raw data, scripts, container images, and references.
 
-## Running
+# Part IV Output
 
-Execute the pipeline using a single command.
+   * **Output Structure**
+      ```bash
+      circleRNA_results/
+      ├── ciri3_de/
+            ├── circ_Gene.txt
+            ├── DE_BSJ_results.txt
+            ├── DE_Ratio_results.txt
+            ├── DE_Relative_results.txt
+            ├── infor_bsj_relative.tsv
+            └── infor_ratio.tsv
+      ├── ciri3_multi/
+            ├── results.txt
+            ├── results.txt.BSJ_Matrix
+            ├── results.txt.FSJ_Matrix
+            └── samples.tsv
+      ├── ciri3_single/
+            ├── Control_Rep1.ciri3.txt
+            ├── ... (files for each sample)
+      ├── featureCounts/
+            ├── counts.txt
+            ├── counts.txt.summary
+            └── Gene_Expression.txt
+      ├── multiqc/
+            ├── multiqc_data/
+            └── multiqc_report.html
+      ```
+      
+   * **Output Interpretation**
+      - **`featureCounts/Gene_Expression.txt`**
 
-### Command Parameters
+        - **Content**: A tab-delimited matrix where rows are gene IDs and columns are samples. Values are the raw read counts assigned to each linear gene.
+        - **Application**: Used as input for the `DE_Relative` analysis (to calculate total host gene counts) and can also be used for standard linear mRNA differential expression analysis (e.g., with DESeq2 or edgeR).
 
-  * `-s`: Path to the sample sheet CSV file (required).
-  * `-o`: Output directory path where results will be saved (required).
-  * `-r`: Reference data directory (required).
-  * `-c`: Path to the `circRNA.sif` Singularity container file (required).
-  * `-b`: Minimum BSJ count for initial filtering (optional, default: 2).
-  * `-t`: Number of threads to use for processing (optional, default: 8).
-  * `-h`: Display the help message.
+      - **`ciri3_multi/results.txt.BSJ_Matrix`**
 
-### Example Command
+        - **Content**: A tab-delimited matrix where rows are circRNA IDs (e.g., `chr1:100|200`) and columns are samples. Values are the raw counts of back-spliced junction (BSJ) reads supporting each circRNA.
+        - **Application**: The primary input file for `DE_BSJ` (differential expression of circRNAs) analysis.
 
-```bash
-bash run_circRNA_pipeline.sh \
-  -s ./samplesheet.csv \
-  -o ./circrna_project_results \
-  -r ./reference_data \
-  -c ./circRNA.sif \
-  -t 16
-```
+      - **`ciri3_multi/results.txt.FSJ_Matrix`**
 
-## Output Structure and Interpretation
+        - **Content**: A tab-delimited matrix in the same format as the BSJ_Matrix, but values are the counts of forward-spliced junction (FSJ) reads corresponding to each circRNA's region.
+        - **Application**: Used in conjunction with the BSJ_Matrix for `DE_Ratio` (differential splicing ratio) analysis to model circRNA splicing efficiency.
 
-After the pipeline completes successfully, the output directory (`circrna_project_results/`) will be organized as follows.
+      - **`ciri3_de/DE_BSJ_results.txt`**
 
-```
-./circrna_project_results/
-├── Control_Rep1/
-│   ├── ciri2_output.tsv
-│   └── ciri2_output.tsv.log
-├── Control_Rep2/
-│   └── ... (same structure as Control_Rep1)
-├── ...
-├── CircTest_results/
-│   └── CircTest_significant_results.tsv
-├── multiqc_report/
-│   └── multiqc_report.html
-├── circ_counts_matrix.tsv
-└── linear_counts_matrix.tsv
-```
+        - **Content**: Differential expression results from the `edgeR` QLF test. Columns include `circRNA_ID`, `logFC`, `PValue`, and `FDR`.
+        - **Application**: Identifies circRNAs that are differentially expressed based on their BSJ counts, normalized for total library size.
 
------
+      - **`ciri3de/DE_Ratio_results.txt`**
 
-### Aggregate Result Files
+        - **Content**: Differential ratio results from the quasibinomial GLM model. Columns include `circRNA_ID`, `Beta` (log-odds ratio), `Mean_Ratio_C1` (Group 1 mean ratio), `Mean_Ratio_C2` (Group 2 mean ratio), `Delta` (difference in ratios), `PValue`, and `FDR`.
+        - **Application**: Identifies *differential usage* of a circRNA. It models the ratio of BSJ / (BSJ + FSJ), which is largely independent of the host gene's expression level.
 
-These files represent the final, combined analysis results from all samples.
+      - **`ciri3_de/DE_Relative_results.txt`**
 
-  * **`CircTest_results/CircTest_significant_results.tsv`**
+        - **Content**: Differential relative expression results from the quasibinomial GLM model. Columns include `circRNA_ID`, `gene_id` (host gene), `Beta`, `Mean_Rel_C1`, `Mean_Rel_C2`, `Delta`, `PValue`, and `FDR`.
+        - **Application**: Identifies circRNAs that change in abundance *relative to their host gene*. It models the ratio of a specific circRNA's BSJ count to the total BSJ counts of all circRNAs from that same host gene (circ_i / (sum(all_circs_from_gene))).
 
-      * **Content**: This is the primary result file, containing the list of statistically significant differentially expressed circRNAs from CircTest. Key columns include:
-          * `CircID`: The unique identifier of the circRNA.
-          * `pval`: The raw p-value from the statistical test.
-          * `padj`: The p-value adjusted for multiple testing.
-          * `group_1_ratio_mean`: The mean circular-to-linear ratio of group 1.
-          * `group_2_ratio_mean`: The mean circular-to-linear ratio of group 2.
-      * **Application**: Use this file to identify your top candidate circRNAs. An orthogonal validation method must be used to validate a predicted circRNA; qPCR validation on its own is not sufficient, at least qPCR + RNase R treatment or preferably qPCR + amplicon sequencing should be used.
+      - **`multiqc_report.html`** : Open `multiqc_report.html` in a web browser to explore all sections interactively.
 
-  * **`circ_counts_matrix.tsv`** and **`linear_counts_matrix.tsv`**
+        - **General Statistics**: A combined table summarizing important metrics for each sample (e.g., FastQC quality, % GC, Total Sequences, TrimGalore trimmed reads, featureCounts assignment rate).
+          <img width="1948" height="1068" alt="CleanShot 2025-11-06 at 18 45 10@2x" src="https://github.com/user-attachments/assets/6dcf5576-dfcb-40e8-be66-b725db4136ce" />
 
-      * **Content**: Two matrices of raw read counts. Rows are circRNAs, and columns are samples. `circ_counts_matrix.tsv` contains the back-spliced junction (BSJ) read counts, while `linear_counts_matrix.tsv` contains reads supporting the linear host gene at the same locus.
-      * **Application**: These matrices are the direct inputs for the CircTest analysis. They are useful for custom quality control checks or for creating visualizations like PCA plots or heatmaps.
+	  
+        - **FastQC**: Quality-control metrics on raw and trimmed reads, including 'Sequence Counts', 'Sequence Quality Histograms', 'Per Sequence Quality Scores', 'Per Base Sequence Content', 'Per Sequence GC Content', 'Per Base N Content', 'Sequence Length Distribution', 'Sequence Duplication Levels', 'Adapter Content'.
+          <img width="1922" height="1436" alt="CleanShot 2025-11-06 at 18 44 40@2x" src="https://github.com/user-attachments/assets/44b203c1-1b5f-4b17-a12a-6365d6e03182" />
 
-* **`multiqc_report`**: Open `multiqc_report.html` in a web browser to explore all sections interactively.
+	      
+        - **Trim Galore!**: Reports the percentage and number of adapter sequences trimmed from each sample.
+          <img width="1956" height="1288" alt="CleanShot 2025-11-06 at 18 44 57@2x" src="https://github.com/user-attachments/assets/38d104ce-831b-4a49-a6d6-f1b153830ecb" />
 
-  	- **Application**: This is the first file you should check to assess the overall quality of your sequencing data and the alignment process. It helps identify problematic samples (e.g., low alignment rate, high duplication) early on.
-
-    	- **General Statistics**: A combined table summarizing important metrics for each sample:
-
-      <img width="1914" height="1184" alt="CleanShot 2025-09-21 at 21 56 18@2x" src="https://github.com/user-attachments/assets/e8b46539-a5cb-4ef5-9517-f2e6f6eac34f" />
-
-
-    	- **FastQC**: Quality-control metrics on raw and trimmed reads, including  
-      'Sequence Counts', 'Sequence Quality Histograms', 'Per Sequence Quality Scores',  
-      'Per Base Sequence Content', 'Per Sequence GC Content', 'Per Base N Content',  
-      'Sequence Length Distribution', 'Sequence Duplication Levels',  
-      'Overrepresented sequences by sample', 'Top overrepresented sequences', 'Adapter Content'.
-
-          - **Sequence Quality Histograms**: The mean quality value across each base position in the read.  
-
-          <img width="1912" height="1322" alt="CleanShot 2025-09-21 at 21 56 33@2x" src="https://github.com/user-attachments/assets/500a5cd6-20c0-4126-a4b0-9fdc3a1d4378" />
-
-
-          - **Adapter Content**: The cumulative percentage count of the proportion of your library which has seen each of the adapter sequences at each position.  
-
-          <img width="1926" height="1222" alt="CleanShot 2025-09-21 at 21 56 49@2x" src="https://github.com/user-attachments/assets/85f72bd6-4a52-43f0-99fd-4c3576220595" />
-
------
-
-### Per-Sample Files (`Control_Rep1/`, etc.)
-
-These directories contain the direct output from the CIRI2 detection step for each sample.
-
-  * **`ciri2_output.tsv`**
-
-      * **Content**: A detailed, tab-separated file listing every circRNA detected in that sample. The columns are:
-          * `circRNA_ID`: Unique identifier (chr:start|end).
-          * `chr`, `circRNA_start`, `circRNA_end`: Genomic coordinates.
-          * `#junction_reads`: The number of back-spliced junction (BSJ) reads. **This is the circular count.**
-          * `SM_MS_SMS`: Information on CIGAR strings of junction reads.
-          * `#non_junction_reads`: The number of reads spanning the junction site consistent with linear splicing. **This is the linear count.**
-          * `junction_reads_ratio`: A metric of circular vs. linear expression.
-          * `circRNA_type`: Annotation of the circRNA (e.g., exon, intron).
-          * `gene_id`, `strand`: Host gene information from the GTF file.
-          * `junction_reads_ID`: A comma-separated list of all BSJ read IDs.
-      * **Application**: This is the raw data file for a single sample. It's useful for deep dives into specific samples or for manual inspection of all detected circRNAs before filtering. The `#junction_reads` and `#non_junction_reads` columns are extracted by the pipeline to build the final count matrices.
-   
-      <img width="2272" height="102" alt="CleanShot 2025-09-21 at 21 57 54@2x" src="https://github.com/user-attachments/assets/6cb4ca67-952a-4091-8424-fb13471a894a" />
+	  
+        - **featureCounts**: Visualizes the percentage of reads assigned to genomic features (e.g., Exon, Intron, Intergenic). A high "Assigned" percentage is desirable.
+          <img width="1912" height="1312" alt="CleanShot 2025-11-06 at 18 44 24@2x" src="https://github.com/user-attachments/assets/b1289371-d1bd-45a6-84d7-06840aff1599" />
 
 
-  * **`ciri2_output.tsv.log`**
-
-      * **Content**: A log file from the CIRI2 run, containing runtime information, parameters used, and summary statistics.
-      * **Application**: Useful for debugging a failed run or for recording the exact parameters and version of the software used for a specific sample.
-      <img width="1484" height="444" alt="CleanShot 2025-09-21 at 21 58 32@2x" src="https://github.com/user-attachments/assets/ca09f4e7-fd48-40c9-9aeb-0f21cd240219" />
+# Reference
+Zheng, X., Zhang, J., Song, L. et al. Detecting and quantifying circular RNAs in terabyte-scale RNA-seq datasets with CIRI3. Nat Biotechnol (2025). https://doi.org/10.1038/s41587-025-02835-1
